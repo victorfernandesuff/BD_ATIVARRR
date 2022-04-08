@@ -10,6 +10,12 @@ nome character varying NOT NULL,
 CONSTRAINT municipio_pk PRIMARY KEY
 (municipio_id));
 
+CREATE TABLE regiao (
+regiao_id SERIAL NOT NULL,
+municipio_id integer NOT NULL,
+bairro_id integer NOT NULL,
+CONSTRAINT regiao_pk PRIMARY KEY (regiao_id));
+
 
 CREATE TABLE antena (
 antena_id integer NOT NULL,
@@ -41,7 +47,7 @@ CONSTRAINT antena_dest_fk FOREIGN KEY
 (antena_dest) REFERENCES antena
 (antena_id));
 
-
+-- PREENCHER LIGACAO
 INSERT INTO public.ligacao (ligacao_id, numero_orig, numero_dest, antena_orig, antena_dest, inicio, fim) VALUES (0, 111111111, 222222222, 0, 1, '2022-04-07 00:22:58.725187', '2022-04-07 00:32:58.725187');
 INSERT INTO public.ligacao (ligacao_id, numero_orig, numero_dest, antena_orig, antena_dest, inicio, fim) VALUES (1, 111111111, 222222222, 2, 3, '2022-04-07 00:22:58.725187', '2022-04-07 00:32:58.725187');
 INSERT INTO public.ligacao (ligacao_id, numero_orig, numero_dest, antena_orig, antena_dest, inicio, fim) VALUES (2, 111111111, 222222222, 1, 0, '2022-04-07 00:22:58.725187', '2022-04-07 00:32:58.725187');
@@ -51,24 +57,52 @@ INSERT INTO public.ligacao (ligacao_id, numero_orig, numero_dest, antena_orig, a
 INSERT INTO public.ligacao (ligacao_id, numero_orig, numero_dest, antena_orig, antena_dest, inicio, fim) VALUES (6, 111111111, 222222222, 0, 1, '2022-04-07 00:22:58.725187', '2022-04-07 00:32:58.725187');
 
 
-
+-- PREENCHER BAIRROS
 insert into bairro values (0, 'Madureira');
 insert into bairro values (1, 'Meier');
 insert into bairro values (2, 'Jacarepagua');
 insert into bairro values (3, 'Penha');
 
+-- PREENCHER MUNICIPIOS
 insert into municipio values (0, 'Rio de Janeiro');
 
+-- PREENCHER ANTENAS
 insert into antena values (0, 0, 0);
 insert into antena values (1, 1, 0);
+insert into antena values (4, 1, 0);
 insert into antena values (2, 2, 0);
 insert into antena values (3, 3, 0);
 
 
+-- PREENCHER REGIAO USANDO AS ANTENAS
+INSERT INTO regiao (municipio_id, bairro_id)
+(select municipio_id, bairro_id from antena group by bairro_id, municipio_id);
+
+
+-- QUERY DE SOLUÇÃO
+select avg(l.fim - l.inicio),
+case when r_orig.regiao_id < r_dest.regiao_id then
+                    concat(r_orig.regiao_id::text, '-', r_dest.regiao_id::text)
+                else concat(r_dest.regiao_id::text, '-', r_orig.regiao_id::text) END
+                as regiao_slug
+from ligacao l
+    left join antena a_dest on l.antena_dest = a_dest.antena_id
+    left join antena a_orig on l.antena_orig = a_orig.antena_id
+    join regiao r_dest on a_dest.municipio_id = r_dest.municipio_id and a_dest.bairro_id = r_dest.bairro_id
+    join regiao r_orig on a_orig.municipio_id = r_orig.municipio_id and a_orig.bairro_id = r_orig.bairro_id
+group by regiao_slug
+
+
+
+
+
+---------------------------------- OUTRAS QUERYS
+
+
+
+
 select antena.bairro_id, antena.municipio_id from antena
 group by antena.bairro_id, antena.municipio_id
-
-
 
 with aux as (select avg(l.fim - l.inicio), l.antena_orig, l.antena_dest
 from ligacao as l
@@ -79,8 +113,6 @@ from ligacao as l
          left join bairro b2 on a2.bairro_id = b2.bairro_id
          left join municipio m2 on m2.municipio_id = a2.municipio_id
 group by l.antena_orig, l.antena_dest)
-
-
 
 with aux as (select
     (l.fim - l.inicio) as time_spent,
@@ -100,7 +132,6 @@ from aux
 group by regiao
 order by average DESC
 
-
 select concat(b.bairro_id::text, '-', m.municipio_id) as id_regiao
 from ligacao as l
          left join antena a on a.antena_id = l.antena_orig
@@ -111,7 +142,6 @@ from ligacao as l
          left join municipio m2 on m2.municipio_id = a2.municipio_id
 group by id_regiao
 --group by l.antena_orig, l.antena_dest
-
 
 select l.antena_orig, l.antena_dest, a.antena_id, b.nome, b2.nome, m.nome,m2.nome
 from ligacao as l
